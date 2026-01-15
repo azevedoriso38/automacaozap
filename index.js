@@ -20,7 +20,7 @@ const io = socketIO(server, {
 // Configurações
 app.use(cors());
 app.use(express.json());
-app.use(express.static('public'));
+app.use(express.static(__dirname));
 app.use(express.urlencoded({ extended: true }));
 
 // Configuração do Multer para upload de arquivos
