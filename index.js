@@ -7,6 +7,7 @@ const fs = require('fs');
 const multer = require('multer');
 const QRCode = require('qrcode');
 const axios = require('axios');
+const FormData = require('form-data');
 
 const app = express();
 const server = http.createServer(app);
@@ -39,89 +40,244 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-// Simulação do estado do WhatsApp
-let whatsappStatus = {
-  connected: false,
-  qrCode: null,
-  sessionId: Date.now().toString()
+// Configuração da API do WhatsApp
+const API_CONFIG = {
+  baseUrl: 'http://localhost:21465',
+  session: 'whatsapp-broadcast',
+  secretKey: 'MY_SECRET_KEY' // Altere para uma chave segura
 };
 
-// Gerar QR Code simulado (na prática, você usaria uma API real)
-function generateQRCode(socket) {
-  // Em uma implementação real, você usaria uma API como:
-  // - WPPConnect: https://github.com/wppconnect-team
-  // - Venom Bot: https://github.com/orkestral/venom
-  // - whatsapp-web.js com servidor separado
-  
-  const sessionData = {
-    sessionId: whatsappStatus.sessionId,
-    timestamp: Date.now()
-  };
-  
-  const qrData = JSON.stringify(sessionData);
-  
-  // Gerar QR code como base64
-  QRCode.toDataURL(qrData, { width: 300 }, (err, url) => {
-    if (err) {
-      console.error('Erro ao gerar QR code:', err);
-      return;
+// Estado da sessão
+let sessionStatus = {
+  connected: false,
+  qrCode: null,
+  sessionId: 'whatsapp-broadcast',
+  phoneNumber: null,
+  name: null
+};
+
+// Funções para interagir com a API WPPConnect
+async function startSession(socket) {
+  try {
+    console.log('Iniciando sessão WhatsApp...');
+    
+    // 1. Iniciar sessão
+    const startResponse = await axios.post(`${API_CONFIG.baseUrl}/api/${API_CONFIG.session}/start-session`, {
+      secretKey: API_CONFIG.secretKey,
+      webhook: ''
+    });
+    
+    console.log('Sessão iniciada:', startResponse.data);
+    
+    // 2. Obter status da sessão
+    const statusResponse = await axios.get(`${API_CONFIG.baseUrl}/api/${API_CONFIG.session}/status-session`);
+    
+    if (statusResponse.data.status === 'QRCODE') {
+      // 3. Se precisar de QR Code, obter e enviar
+      const qrResponse = await axios.get(`${API_CONFIG.baseUrl}/api/${API_CONFIG.session}/qr-code`, {
+        responseType: 'arraybuffer'
+      });
+      
+      // Converter para base64
+      const qrBase64 = Buffer.from(qrResponse.data, 'binary').toString('base64');
+      sessionStatus.qrCode = `data:image/png;base64,${qrBase64}`;
+      
+      // Enviar QR para frontend
+      if (socket) {
+        socket.emit('qr', sessionStatus.qrCode);
+        socket.emit('status', { 
+          connected: false, 
+          message: 'Escaneie o QR Code' 
+        });
+      }
+      
+      // Iniciar polling para verificar conexão
+      checkConnection(socket);
+      
+    } else if (statusResponse.data.status === 'CONNECTED') {
+      sessionStatus.connected = true;
+      sessionStatus.phoneNumber = statusResponse.data.phone;
+      sessionStatus.name = statusResponse.data.name;
+      
+      if (socket) {
+        socket.emit('authenticated', {
+          phone: sessionStatus.phoneNumber,
+          name: sessionStatus.name
+        });
+        socket.emit('status', { 
+          connected: true, 
+          message: `Conectado como ${sessionStatus.name}` 
+        });
+      }
     }
     
-    whatsappStatus.qrCode = url;
+  } catch (error) {
+    console.error('Erro ao iniciar sessão:', error.message);
     
-    // Enviar para o frontend
+    // Se der erro, tentar modo fallback com QR code simulado
+    if (socket) {
+      socket.emit('error', 'API offline. Usando modo simulação.');
+      generateFallbackQR(socket);
+    }
+  }
+}
+
+async function checkConnection(socket) {
+  const interval = setInterval(async () => {
+    try {
+      const statusResponse = await axios.get(`${API_CONFIG.baseUrl}/api/${API_CONFIG.session}/status-session`);
+      
+      if (statusResponse.data.status === 'CONNECTED') {
+        clearInterval(interval);
+        
+        sessionStatus.connected = true;
+        sessionStatus.phoneNumber = statusResponse.data.phone;
+        sessionStatus.name = statusResponse.data.name;
+        sessionStatus.qrCode = null;
+        
+        if (socket) {
+          socket.emit('authenticated', {
+            phone: sessionStatus.phoneNumber,
+            name: sessionStatus.name
+          });
+          socket.emit('status', { 
+            connected: true, 
+            message: `Conectado como ${sessionStatus.name}` 
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Erro ao verificar conexão:', error.message);
+    }
+  }, 3000); // Verificar a cada 3 segundos
+}
+
+function generateFallbackQR(socket) {
+  // Gerar QR code fallback (para quando a API estiver offline)
+  const qrData = JSON.stringify({
+    sessionId: sessionStatus.sessionId,
+    timestamp: Date.now(),
+    fallback: true
+  });
+  
+  QRCode.toDataURL(qrData, { width: 300 }, (err, url) => {
+    if (err) return;
+    
+    sessionStatus.qrCode = url;
+    
     if (socket) {
       socket.emit('qr', url);
       socket.emit('status', { 
         connected: false, 
-        message: 'Escaneie o QR Code com seu WhatsApp' 
+        message: 'API offline. Modo simulação.' 
       });
     }
   });
 }
 
-// Rotas API
-app.get('/api/status', (req, res) => {
-  res.json({
-    connected: whatsappStatus.connected,
-    hasQr: !!whatsappStatus.qrCode,
-    sessionId: whatsappStatus.sessionId
-  });
-});
+async function sendMessageReal(phoneNumber, message) {
+  try {
+    // Formatar número para padrão internacional
+    let phone = phoneNumber.replace(/\D/g, '');
+    
+    // Adicionar código do Brasil se não tiver
+    if (phone.length === 11 && !phone.startsWith('55')) {
+      phone = '55' + phone;
+    } else if (phone.length === 10) {
+      phone = '55' + phone;
+    }
+    
+    // Enviar mensagem via API
+    const response = await axios.post(`${API_CONFIG.baseUrl}/api/${API_CONFIG.session}/send-message`, {
+      phone: phone + '@c.us',
+      message: message,
+      isGroup: false
+    }, {
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': API_CONFIG.secretKey
+      }
+    });
+    
+    return {
+      success: true,
+      messageId: response.data.messageId,
+      status: 'sent'
+    };
+    
+  } catch (error) {
+    console.error('Erro ao enviar mensagem:', error.message);
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
 
-app.get('/api/qr', async (req, res) => {
-  if (whatsappStatus.qrCode && !whatsappStatus.connected) {
-    res.json({ qr: whatsappStatus.qrCode });
-  } else {
-    res.json({ qr: null, connected: whatsappStatus.connected });
+// Rotas API
+app.get('/api/status', async (req, res) => {
+  try {
+    // Tentar obter status real da API
+    const statusResponse = await axios.get(`${API_CONFIG.baseUrl}/api/${API_CONFIG.session}/status-session`);
+    
+    sessionStatus.connected = statusResponse.data.status === 'CONNECTED';
+    sessionStatus.phoneNumber = statusResponse.data.phone;
+    sessionStatus.name = statusResponse.data.name;
+    
+    res.json({
+      connected: sessionStatus.connected,
+      hasQr: !!sessionStatus.qrCode,
+      phone: sessionStatus.phoneNumber,
+      name: sessionStatus.name,
+      status: statusResponse.data.status
+    });
+    
+  } catch (error) {
+    // Se API offline, retornar status local
+    res.json({
+      connected: sessionStatus.connected,
+      hasQr: !!sessionStatus.qrCode,
+      phone: sessionStatus.phoneNumber,
+      name: sessionStatus.name,
+      status: 'API_OFFLINE',
+      message: 'API WhatsApp offline'
+    });
   }
 });
 
-app.get('/api/connect', (req, res) => {
-  whatsappStatus.connected = true;
-  whatsappStatus.qrCode = null;
-  
-  // Emitir para todos os sockets conectados
-  io.emit('authenticated');
-  io.emit('status', { 
-    connected: true, 
-    message: 'WhatsApp conectado com sucesso!' 
-  });
-  
-  res.json({ success: true, message: 'Conectado' });
+app.get('/api/qr', async (req, res) => {
+  if (sessionStatus.qrCode && !sessionStatus.connected) {
+    res.json({ qr: sessionStatus.qrCode });
+  } else {
+    res.json({ qr: null, connected: sessionStatus.connected });
+  }
 });
 
-app.get('/api/disconnect', (req, res) => {
-  whatsappStatus.connected = false;
-  whatsappStatus.qrCode = null;
-  
-  io.emit('disconnected');
-  io.emit('status', { 
-    connected: false, 
-    message: 'Desconectado' 
-  });
-  
-  res.json({ success: true, message: 'Desconectado' });
+app.get('/api/start-session', async (req, res) => {
+  try {
+    await startSession();
+    res.json({ success: true, message: 'Sessão iniciada' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/logout', async (req, res) => {
+  try {
+    await axios.post(`${API_CONFIG.baseURL}/api/${API_CONFIG.session}/logout-session`);
+    
+    sessionStatus.connected = false;
+    sessionStatus.qrCode = null;
+    sessionStatus.phoneNumber = null;
+    sessionStatus.name = null;
+    
+    io.emit('disconnected');
+    io.emit('status', { connected: false, message: 'Desconectado' });
+    
+    res.json({ success: true, message: 'Desconectado' });
+  } catch (error) {
+    res.json({ success: false, error: error.message });
+  }
 });
 
 app.post('/api/upload-contacts', upload.single('contactsFile'), (req, res) => {
@@ -133,25 +289,22 @@ app.post('/api/upload-contacts', upload.single('contactsFile'), (req, res) => {
     const filePath = req.file.path;
     const fileContent = fs.readFileSync(filePath, 'utf8');
     
-    // Processar números de telefone
+    // Processar números
     const contacts = fileContent
       .split('\n')
       .map(line => line.trim())
       .filter(line => line.length > 0)
       .map(line => {
-        // Extrair apenas números
         const phone = line.replace(/\D/g, '');
         
-        // Validar e formatar (exemplo para Brasil)
+        // Validar número
         if (phone.length >= 10 && phone.length <= 13) {
-          // Formatar para WhatsApp (código país + número)
+          // Garantir que tem código do país
           let formatted = phone;
-          if (phone.length === 11 && phone.startsWith('55')) {
-            formatted = phone; // Já tem código do país
-          } else if (phone.length === 11) {
-            formatted = '55' + phone; // Adicionar código do Brasil
+          if (phone.length === 11 && !phone.startsWith('55')) {
+            formatted = '55' + phone;
           } else if (phone.length === 10) {
-            formatted = '55' + phone; // Adicionar código do Brasil
+            formatted = '55' + phone;
           }
           return formatted;
         }
@@ -162,15 +315,13 @@ app.post('/api/upload-contacts', upload.single('contactsFile'), (req, res) => {
     // Limpar arquivo
     try {
       fs.unlinkSync(filePath);
-    } catch (err) {
-      console.log('Erro ao deletar arquivo:', err);
-    }
+    } catch (err) {}
 
     res.json({
       success: true,
       contacts: contacts,
       count: contacts.length,
-      sample: contacts.slice(0, 5) // Mostrar apenas 5 como exemplo
+      sample: contacts.slice(0, 3)
     });
 
   } catch (error) {
@@ -183,8 +334,14 @@ app.post('/api/send-messages', async (req, res) => {
   try {
     const { contacts, message } = req.body;
 
-    if (!whatsappStatus.connected) {
-      return res.status(400).json({ error: 'WhatsApp não está conectado' });
+    if (!sessionStatus.connected) {
+      // Se não estiver conectado, tentar verificar status
+      try {
+        const statusResponse = await axios.get(`${API_CONFIG.baseUrl}/api/${API_CONFIG.session}/status-session`);
+        sessionStatus.connected = statusResponse.data.status === 'CONNECTED';
+      } catch (error) {
+        return res.status(400).json({ error: 'WhatsApp não está conectado' });
+      }
     }
 
     if (!contacts || !Array.isArray(contacts) || contacts.length === 0) {
@@ -195,51 +352,65 @@ app.post('/api/send-messages', async (req, res) => {
       return res.status(400).json({ error: 'Mensagem não pode estar vazia' });
     }
 
-    // Limitar a 10 contatos por vez para demonstração
-    const limitedContacts = contacts.slice(0, 10);
-    
-    // Simular envio de mensagens
+    // Limitar a 50 mensagens por vez
+    const contactsToSend = contacts.slice(0, 50);
     const results = [];
     let successCount = 0;
     let errorCount = 0;
 
-    for (let i = 0; i < limitedContacts.length; i++) {
-      const contact = limitedContacts[i];
+    for (let i = 0; i < contactsToSend.length; i++) {
+      const contact = contactsToSend[i];
       
-      // Simular atraso entre mensagens
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      // Simular resultado (80% de sucesso, 20% de erro)
-      const randomSuccess = Math.random() > 0.2;
-      
-      if (randomSuccess) {
-        successCount++;
-        results.push({
-          contact: contact,
-          status: 'success',
-          message: 'Mensagem enviada com sucesso (simulado)',
-          timestamp: new Date().toISOString()
-        });
+      try {
+        // Enviar mensagem REAL
+        const result = await sendMessageReal(contact, message);
         
-        // Emitir progresso em tempo real
-        io.emit('message_progress', {
-          current: i + 1,
-          total: limitedContacts.length,
-          contact: contact,
-          status: 'success'
-        });
-      } else {
+        if (result.success) {
+          successCount++;
+          results.push({
+            contact: contact,
+            status: 'success',
+            message: 'Mensagem enviada',
+            messageId: result.messageId
+          });
+          
+          // Emitir progresso
+          io.emit('message_progress', {
+            current: i + 1,
+            total: contactsToSend.length,
+            contact: contact,
+            status: 'success'
+          });
+        } else {
+          errorCount++;
+          results.push({
+            contact: contact,
+            status: 'error',
+            message: result.error
+          });
+          
+          io.emit('message_progress', {
+            current: i + 1,
+            total: contactsToSend.length,
+            contact: contact,
+            status: 'error'
+          });
+        }
+        
+        // Aguardar 2 segundos entre mensagens para evitar bloqueio
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+      } catch (error) {
         errorCount++;
         results.push({
           contact: contact,
           status: 'error',
-          message: 'Erro ao enviar (simulado)',
-          timestamp: new Date().toISOString()
+          message: error.message
         });
         
         io.emit('message_progress', {
           current: i + 1,
-          total: limitedContacts.length,
+          total: contactsToSend.length,
           contact: contact,
           status: 'error'
         });
@@ -248,16 +419,16 @@ app.post('/api/send-messages', async (req, res) => {
 
     res.json({
       success: true,
-      total: limitedContacts.length,
+      total: contactsToSend.length,
       sent: successCount,
       failed: errorCount,
       results: results,
-      note: 'Esta é uma demonstração. Para envio real, conecte uma API de WhatsApp.'
+      note: sessionStatus.connected ? 'Mensagens enviadas via API real' : 'Modo simulação'
     });
 
   } catch (error) {
-    console.error('Erro:', error);
-    res.status(500).json({ error: 'Erro ao processar envio' });
+    console.error('Erro ao enviar mensagens:', error);
+    res.status(500).json({ error: 'Erro ao enviar mensagens: ' + error.message });
   }
 });
 
@@ -267,41 +438,26 @@ io.on('connection', (socket) => {
 
   // Enviar status atual
   socket.emit('status', { 
-    connected: whatsappStatus.connected,
-    message: whatsappStatus.connected ? 'Conectado' : 'Desconectado'
+    connected: sessionStatus.connected,
+    message: sessionStatus.connected ? `Conectado como ${sessionStatus.name}` : 'Desconectado'
   });
 
-  socket.on('initialize', () => {
-    console.log('Solicitando inicialização do WhatsApp...');
+  socket.on('initialize', async () => {
+    console.log('Inicializando WhatsApp REAL...');
     
-    if (!whatsappStatus.connected) {
-      // Simular conexão após 2 segundos (para demonstração)
+    if (!sessionStatus.connected) {
       socket.emit('status', { 
         connected: false, 
-        message: 'Iniciando conexão...' 
+        message: 'Conectando à API WhatsApp...' 
       });
       
-      setTimeout(() => {
-        generateQRCode(socket);
-      }, 1000);
+      await startSession(socket);
     } else {
-      socket.emit('authenticated');
+      socket.emit('authenticated', {
+        phone: sessionStatus.phoneNumber,
+        name: sessionStatus.name
+      });
     }
-  });
-
-  socket.on('simulate_scan', () => {
-    // Simular escaneamento do QR code
-    whatsappStatus.connected = true;
-    whatsappStatus.qrCode = null;
-    
-    socket.emit('authenticated');
-    socket.emit('status', { 
-      connected: true, 
-      message: 'WhatsApp conectado com sucesso!' 
-    });
-    
-    // Emitir para todos
-    io.emit('authenticated');
   });
 
   socket.on('disconnect', () => {
@@ -318,5 +474,6 @@ app.get('/', (req, res) => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Servidor rodando na porta ${PORT}`);
-  console.log(`Acesse: http://localhost:${PORT}`);
+  console.log(`API WhatsApp: ${API_CONFIG.baseUrl}`);
+  console.log(`Sessão: ${API_CONFIG.session}`);
 });
