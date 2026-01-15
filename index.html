@@ -1,350 +1,223 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>WhatsApp Broadcast</title>
+    <title>Bot WhatsApp</title>
+    <meta charset="UTF-8">
     <style>
-        body {
-            font-family: Arial;
-            padding: 20px;
-            max-width: 600px;
-            margin: 0 auto;
-            background: #f5f5f5;
-        }
-        .section {
-            background: white;
-            margin: 20px 0;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-        }
-        h1 {
-            text-align: center;
-            color: #25D366;
-        }
-        h2 {
-            color: #075E54;
-            margin-top: 0;
-            border-bottom: 2px solid #25D366;
-            padding-bottom: 10px;
-        }
-        #status {
-            padding: 15px;
-            border-radius: 5px;
-            font-weight: bold;
-            text-align: center;
-            margin: 15px 0;
-        }
-        .connected { 
-            background: #d4edda; 
-            color: #155724;
-            border: 1px solid #c3e6cb;
-        }
-        .disconnected { 
-            background: #f8d7da; 
-            color: #721c24;
-            border: 1px solid #f5c6cb;
-        }
-        .button {
-            background: #25D366;
-            color: white;
-            border: none;
-            padding: 12px 20px;
-            border-radius: 5px;
-            cursor: pointer;
-            font-size: 16px;
-            margin: 5px;
-            width: 100%;
-        }
-        .button:hover { background: #1da851; }
-        .button-danger { background: #dc3545; }
-        .button-danger:hover { background: #c82333; }
-        textarea {
-            width: 100%;
-            height: 120px;
-            margin: 10px 0;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            font-family: Arial;
-        }
-        input[type="file"] {
-            margin: 10px 0;
-            padding: 10px;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            width: 100%;
-        }
-        #qrcode {
-            text-align: center;
-            margin: 20px 0;
-        }
-        #qrcode img {
-            max-width: 250px;
-            border: 1px solid #ddd;
-            padding: 10px;
-            background: white;
-        }
-        .progress {
-            background: #e9ecef;
-            border-radius: 5px;
-            margin: 10px 0;
-            overflow: hidden;
-        }
-        .progress-bar {
-            background: #25D366;
-            height: 20px;
-            width: 0%;
-            transition: width 0.3s;
-        }
-        .result-item {
-            padding: 8px;
-            margin: 5px 0;
-            border-radius: 3px;
-            font-size: 14px;
-        }
-        .success { background: #d4edda; }
-        .error { background: #f8d7da; }
-        .info {
-            background: #d1ecf1;
-            color: #0c5460;
-            padding: 15px;
-            border-radius: 5px;
-            margin: 15px 0;
-            border: 1px solid #bee5eb;
-        }
+        body { font-family: Arial; margin: 20px; }
+        .card { border: 1px solid #ddd; padding: 20px; margin: 10px 0; border-radius: 5px; }
+        input, textarea, select { width: 100%; padding: 8px; margin: 5px 0; }
+        button { padding: 10px; margin: 5px; cursor: pointer; }
+        .btn-primary { background: #25D366; color: white; border: none; }
+        .btn-danger { background: #dc3545; color: white; border: none; }
+        .hidden { display: none; }
+        #qrcode { margin: 10px auto; }
+        .status { padding: 10px; margin: 5px 0; }
+        .connected { background: #d4edda; }
+        .disconnected { background: #f8d7da; }
     </style>
 </head>
 <body>
-    <h1>📱 WhatsApp Broadcast</h1>
+    <h1>📱 Bot WhatsApp - Envio em Massa</h1>
     
-    <div class="section">
-        <h2>Status da Conexão</h2>
-        <div id="status" class="disconnected">🔴 Desconectado</div>
-        
-        <div id="connection-buttons">
-            <button class="button" onclick="connectWhatsApp()">🔗 Conectar WhatsApp</button>
-            <button class="button button-danger" onclick="disconnectWhatsApp()">🚫 Desconectar</button>
-            <button class="button" onclick="simulateScan()" style="background: #6c757d;">🔄 Simular Conexão (Teste)</button>
+    <div class="card">
+        <h3>🔗 Status da Conexão</h3>
+        <div id="status" class="status disconnected">Desconectado</div>
+        <button id="connectBtn" class="btn-primary">Conectar WhatsApp</button>
+        <button id="disconnectBtn" class="btn-danger" disabled>Desconectar</button>
+        <div id="qrcodeContainer" class="hidden">
+            <h4>📲 Escaneie o QR Code:</h4>
+            <div id="qrcode"></div>
+            <p>WhatsApp > ⋮ > Dispositivos conectados > Conectar um dispositivo</p>
         </div>
-        
-        <div id="qrcode"></div>
-        <div id="qr-instruction" style="text-align: center; color: #666; display: none;">
-            <p>1. Abra o WhatsApp no seu celular</p>
-            <p>2. Toque em ⋮ → Dispositivos conectados → Conectar um dispositivo</p>
-            <p>3. Escaneie o QR Code acima</p>
-        </div>
-    </div>
-    
-    <div class="section">
-        <h2>📋 Envio em Massa</h2>
-        
-        <div class="info">
-            <strong>⚠️ Modo Demonstração:</strong> 
-            Para envio real, é necessário conectar uma API de WhatsApp. 
-            Atualmente funcionando em modo simulação.
-        </div>
-        
-        <p><strong>1. Carregar Contatos:</strong></p>
-        <p>Crie um arquivo .txt com um número por linha:</p>
-        <p><small>Exemplo: 11999999999<br>21988888888<br>31977777777</small></p>
-        <input type="file" id="contactsFile" accept=".txt,.csv">
-        <div id="fileInfo"></div>
-        
-        <p><strong>2. Digitar Mensagem:</strong></p>
-        <textarea id="message" placeholder="Digite sua mensagem aqui..."></textarea>
-        
-        <p><strong>3. Enviar:</strong></p>
-        <button class="button" onclick="sendMessages()">📤 Enviar Mensagens</button>
-        
-        <div id="progress" style="display: none;">
-            <p>Progresso: <span id="progress-text">0/0</span></p>
-            <div class="progress">
-                <div class="progress-bar" id="progress-bar"></div>
-            </div>
-        </div>
-        
-        <div id="results"></div>
     </div>
 
-    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <div class="card">
+        <h3>✉️ Envio em Massa</h3>
+        <select id="messageType">
+            <option value="text">Texto</option>
+            <option value="image">Imagem</option>
+        </select>
+        
+        <textarea id="message" rows="4" placeholder="Digite sua mensagem..."></textarea>
+        
+        <div id="mediaInput" class="hidden">
+            <input type="text" id="mediaUrl" placeholder="URL da imagem...">
+        </div>
+        
+        <textarea id="recipients" rows="4" placeholder="Números (1 por linha): 5511999999999"></textarea>
+        
+        <input type="number" id="delay" value="2" min="1" placeholder="Delay entre envios (segundos)">
+        
+        <button id="sendBtn" class="btn-primary" disabled>Enviar Mensagens</button>
+        <button id="stopBtn" class="btn-danger hidden">Parar</button>
+        
+        <div id="progress" class="hidden">
+            <div id="progressBar" style="height:20px;background:#ddd;width:0%"></div>
+            <div id="progressText">0/0</div>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>📋 Logs</h3>
+        <div id="logs"></div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
-        let socket = io();
-        let contactsList = [];
-        let isConnected = false;
-        
-        // Conexão Socket.io
+        const socket = io();
+        let isSending = false;
+
+        // Elementos
+        const statusDiv = document.getElementById('status');
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const qrcodeContainer = document.getElementById('qrcodeContainer');
+        const qrcodeDiv = document.getElementById('qrcode');
+        const sendBtn = document.getElementById('sendBtn');
+        const stopBtn = document.getElementById('stopBtn');
+        const messageType = document.getElementById('messageType');
+        const mediaInput = document.getElementById('mediaInput');
+        const progressDiv = document.getElementById('progress');
+        const progressBar = document.getElementById('progressBar');
+        const progressText = document.getElementById('progressText');
+        const logsDiv = document.getElementById('logs');
+
+        // Socket events
         socket.on('connect', () => {
-            console.log('Conectado ao servidor');
+            addLog('Conectado ao servidor');
+            socket.emit('check-status');
         });
-        
+
         socket.on('status', (data) => {
-            updateStatus(data.connected, data.message);
+            updateStatus(data);
         });
-        
-        socket.on('qr', (qrCode) => {
-            document.getElementById('qrcode').innerHTML = 
-                `<img src="${qrCode}" alt="QR Code">`;
-            document.getElementById('qr-instruction').style.display = 'block';
-            updateStatus(false, 'Escaneie o QR Code');
-        });
-        
-        socket.on('authenticated', () => {
-            document.getElementById('qrcode').innerHTML = '';
-            document.getElementById('qr-instruction').style.display = 'none';
-            updateStatus(true, 'Conectado ✓');
-        });
-        
-        socket.on('disconnected', () => {
-            updateStatus(false, 'Desconectado');
-        });
-        
-        socket.on('message_progress', (data) => {
-            updateProgress(data.current, data.total, data.contact, data.status);
-        });
-        
-        // Funções
-        function updateStatus(connected, message) {
-            isConnected = connected;
-            const statusDiv = document.getElementById('status');
-            
-            if (connected) {
-                statusDiv.innerHTML = '🟢 ' + message;
-                statusDiv.className = 'connected';
-            } else {
-                statusDiv.innerHTML = '🔴 ' + message;
-                statusDiv.className = 'disconnected';
-            }
-        }
-        
-        function connectWhatsApp() {
-            socket.emit('initialize');
-            updateStatus(false, 'Inicializando...');
-        }
-        
-        function disconnectWhatsApp() {
-            fetch('/api/disconnect')
-                .then(response => response.json())
-                .then(data => {
-                    alert(data.message);
-                });
-        }
-        
-        function simulateScan() {
-            socket.emit('simulate_scan');
-        }
-        
-        // Processar arquivo
-        document.getElementById('contactsFile').addEventListener('change', async function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            
-            const formData = new FormData();
-            formData.append('contactsFile', file);
-            
-            try {
-                const response = await fetch('/api/upload-contacts', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    contactsList = data.contacts;
-                    document.getElementById('fileInfo').innerHTML = 
-                        `<div class="info">✅ <strong>${data.count} contatos carregados</strong><br>
-                        Exemplo: ${data.sample.join(', ')}...</div>`;
-                } else {
-                    alert('Erro: ' + data.error);
-                }
-            } catch (error) {
-                alert('Erro ao carregar arquivo');
-            }
-        });
-        
-        // Enviar mensagens
-        async function sendMessages() {
-            const message = document.getElementById('message').value.trim();
-            
-            if (!message) {
-                alert('Digite uma mensagem');
-                return;
-            }
-            
-            if (contactsList.length === 0) {
-                alert('Carregue uma lista de contatos primeiro');
-                return;
-            }
-            
-            if (!isConnected) {
-                if (!confirm('WhatsApp não está conectado. Deseja continuar em modo simulação?')) {
-                    return;
-                }
-            }
-            
-            // Mostrar progresso
-            document.getElementById('progress').style.display = 'block';
-            document.getElementById('progress-text').textContent = '0/' + contactsList.length;
-            document.getElementById('progress-bar').style.width = '0%';
-            document.getElementById('results').innerHTML = '';
-            
-            const response = await fetch('/api/send-messages', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    contacts: contactsList,
-                    message: message
-                })
+
+        socket.on('qr', (qr) => {
+            qrcodeContainer.classList.remove('hidden');
+            qrcodeDiv.innerHTML = '';
+            QRCode.toCanvas(qrcodeDiv, qr, { width: 200 }, (error) => {
+                if (error) console.error(error);
             });
-            
-            const data = await response.json();
-            
-            if (data.success) {
-                let resultsHtml = `<h3>📊 Resultados:</h3>`;
-                resultsHtml += `<p>Total: ${data.total} | ✅ Enviados: ${data.sent} | ❌ Falhas: ${data.failed}</p>`;
-                
-                if (data.note) {
-                    resultsHtml += `<div class="info">${data.note}</div>`;
-                }
-                
-                data.results.forEach(result => {
-                    const statusClass = result.status === 'success' ? 'success' : 'error';
-                    const icon = result.status === 'success' ? '✅' : '❌';
-                    resultsHtml += `
-                        <div class="result-item ${statusClass}">
-                            ${icon} ${result.contact}: ${result.message}
-                        </div>
-                    `;
-                });
-                
-                document.getElementById('results').innerHTML = resultsHtml;
-            } else {
-                alert('Erro: ' + data.error);
-            }
-            
-            // Esconder progresso
-            setTimeout(() => {
-                document.getElementById('progress').style.display = 'none';
-            }, 2000);
-        }
-        
-        function updateProgress(current, total, contact, status) {
-            const percent = Math.round((current / total) * 100);
-            document.getElementById('progress-text').textContent = `${current}/${total}`;
-            document.getElementById('progress-bar').style.width = `${percent}%`;
-        }
-        
-        // Carregar status inicial
-        window.onload = async () => {
-            try {
-                const response = await fetch('/api/status');
-                const status = await response.json();
-                updateStatus(status.connected, status.connected ? 'Conectado' : 'Desconectado');
-            } catch (error) {
-                console.log('Erro ao carregar status:', error);
-            }
+        });
+
+        socket.on('ready', () => {
+            qrcodeContainer.classList.add('hidden');
+            updateStatus({ connected: true, message: 'Conectado!' });
+        });
+
+        socket.on('disconnected', () => {
+            updateStatus({ connected: false, message: 'Desconectado' });
+        });
+
+        socket.on('send-progress', (data) => {
+            const percent = (data.sent / data.total) * 100;
+            progressBar.style.width = percent + '%';
+            progressText.textContent = `${data.sent}/${data.total}`;
+            addLog(`${data.status} - ${data.number}`);
+        });
+
+        socket.on('send-complete', () => {
+            isSending = false;
+            sendBtn.disabled = false;
+            stopBtn.classList.add('hidden');
+            addLog('✅ Envio completo!');
+        });
+
+        socket.on('send-error', (error) => {
+            addLog(`❌ Erro: ${error}`, 'error');
+        });
+
+        // Botões
+        connectBtn.onclick = () => {
+            socket.emit('connect-whatsapp');
+            addLog('Iniciando conexão...');
         };
+
+        disconnectBtn.onclick = () => {
+            socket.emit('disconnect-whatsapp');
+        };
+
+        messageType.onchange = () => {
+            mediaInput.classList.toggle('hidden', messageType.value === 'text');
+        };
+
+        sendBtn.onclick = () => {
+            const message = document.getElementById('message').value;
+            const recipients = document.getElementById('recipients').value
+                .split('\n')
+                .filter(num => num.trim());
+            const delay = parseInt(document.getElementById('delay').value) || 2;
+            const type = messageType.value;
+            const mediaUrl = document.getElementById('mediaUrl').value;
+
+            if (!message && type === 'text') {
+                alert('Digite uma mensagem!');
+                return;
+            }
+
+            if (type === 'image' && !mediaUrl) {
+                alert('Informe a URL da imagem!');
+                return;
+            }
+
+            if (recipients.length === 0) {
+                alert('Adicione pelo menos um número!');
+                return;
+            }
+
+            socket.emit('send-messages', {
+                type,
+                message,
+                recipients,
+                delay,
+                mediaUrl
+            });
+
+            isSending = true;
+            sendBtn.disabled = true;
+            stopBtn.classList.remove('hidden');
+            progressDiv.classList.remove('hidden');
+            progressBar.style.width = '0%';
+            progressText.textContent = `0/${recipients.length}`;
+            addLog(`📤 Iniciando envio para ${recipients.length} contatos...`);
+        };
+
+        stopBtn.onclick = () => {
+            socket.emit('stop-sending');
+            isSending = false;
+            sendBtn.disabled = false;
+            stopBtn.classList.add('hidden');
+            addLog('⏹️ Envio interrompido');
+        };
+
+        // Funções auxiliares
+        function updateStatus(data) {
+            if (data.connected) {
+                statusDiv.className = 'status connected';
+                statusDiv.textContent = '✅ ' + (data.message || 'Conectado');
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                sendBtn.disabled = false;
+            } else {
+                statusDiv.className = 'status disconnected';
+                statusDiv.textContent = '❌ ' + (data.message || 'Desconectado');
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                sendBtn.disabled = true;
+                qrcodeContainer.classList.add('hidden');
+            }
+        }
+
+        function addLog(message, type = 'info') {
+            const log = document.createElement('div');
+            const time = new Date().toLocaleTimeString();
+            log.innerHTML = `[${time}] ${message}`;
+            log.style.color = type === 'error' ? '#dc3545' : '#333';
+            log.style.margin = '5px 0';
+            logsDiv.prepend(log);
+        }
     </script>
 </body>
 </html>
