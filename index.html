@@ -4,139 +4,161 @@
     <title>Bot WhatsApp</title>
     <meta charset="UTF-8">
     <style>
-        body { font-family: Arial; margin: 20px; }
-        .card { border: 1px solid #ddd; padding: 20px; margin: 10px 0; border-radius: 5px; }
-        input, textarea, select { width: 100%; padding: 8px; margin: 5px 0; }
-        button { padding: 10px; margin: 5px; cursor: pointer; }
-        .btn-primary { background: #25D366; color: white; border: none; }
-        .btn-danger { background: #dc3545; color: white; border: none; }
+        body { font-family: Arial; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: auto; }
+        .card { background: white; padding: 20px; margin: 10px 0; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); }
+        input, textarea, select { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ddd; border-radius: 4px; }
+        button { padding: 10px 15px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .btn-primary { background: #25D366; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
         .hidden { display: none; }
-        #qrcode { margin: 10px auto; }
-        .status { padding: 10px; margin: 5px 0; }
-        .connected { background: #d4edda; }
-        .disconnected { background: #f8d7da; }
+        #qrcode { margin: 20px auto; text-align: center; }
+        .status { padding: 10px; border-radius: 4px; margin: 10px 0; font-weight: bold; }
+        .connected { background: #d4edda; color: #155724; }
+        .disconnected { background: #f8d7da; color: #721c24; }
+        .progress { height: 20px; background: #eee; border-radius: 10px; overflow: hidden; margin: 10px 0; }
+        .progress-bar { height: 100%; background: #25D366; width: 0%; transition: width 0.3s; }
+        #logs { max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 10px; border-radius: 4px; }
+        .log { margin: 5px 0; padding: 5px; border-left: 3px solid #25D366; background: white; }
+        .log-error { border-color: #dc3545; }
     </style>
 </head>
 <body>
-    <h1>📱 Bot WhatsApp - Envio em Massa</h1>
-    
-    <div class="card">
-        <h3>🔗 Status da Conexão</h3>
-        <div id="status" class="status disconnected">Desconectado</div>
-        <button id="connectBtn" class="btn-primary">Conectar WhatsApp</button>
-        <button id="disconnectBtn" class="btn-danger" disabled>Desconectar</button>
-        <div id="qrcodeContainer" class="hidden">
-            <h4>📲 Escaneie o QR Code:</h4>
-            <div id="qrcode"></div>
-            <p>WhatsApp > ⋮ > Dispositivos conectados > Conectar um dispositivo</p>
+    <div class="container">
+        <h1>📱 Bot WhatsApp - Envio em Massa</h1>
+        
+        <div class="card">
+            <h3>🔗 Status</h3>
+            <div id="status" class="status disconnected">Desconectado</div>
+            <button id="connectBtn" class="btn-primary">Conectar WhatsApp</button>
+            <button id="disconnectBtn" class="btn-danger" disabled>Desconectar</button>
+            
+            <div id="qrcodeContainer" class="hidden">
+                <h4>📲 Escaneie o QR Code:</h4>
+                <div id="qrcode"></div>
+                <p><strong>Como escanear:</strong> WhatsApp → ⋮ → Dispositivos conectados → Conectar um dispositivo</p>
+            </div>
         </div>
-    </div>
 
-    <div class="card">
-        <h3>✉️ Envio em Massa</h3>
-        <select id="messageType">
-            <option value="text">Texto</option>
-            <option value="image">Imagem</option>
-        </select>
-        
-        <textarea id="message" rows="4" placeholder="Digite sua mensagem..."></textarea>
-        
-        <div id="mediaInput" class="hidden">
-            <input type="text" id="mediaUrl" placeholder="URL da imagem...">
+        <div class="card">
+            <h3>✉️ Envio em Massa</h3>
+            
+            <select id="messageType">
+                <option value="text">Texto</option>
+                <option value="image">Imagem</option>
+            </select>
+            
+            <textarea id="message" rows="3" placeholder="Digite sua mensagem..."></textarea>
+            
+            <div id="mediaInput" class="hidden">
+                <input type="text" id="mediaUrl" placeholder="URL da imagem (https://...)">
+            </div>
+            
+            <textarea id="recipients" rows="4" placeholder="Números (1 por linha):
+5511999999999
+5511888888888"></textarea>
+            
+            <input type="number" id="delay" value="2" min="1" placeholder="Delay entre envios (segundos)">
+            
+            <button id="sendBtn" class="btn-primary" disabled>🚀 Enviar Mensagens</button>
+            <button id="stopBtn" class="btn-danger hidden">⏹️ Parar</button>
+            
+            <div id="progress" class="hidden">
+                <div class="progress">
+                    <div id="progressBar" class="progress-bar"></div>
+                </div>
+                <div id="progressText">0/0</div>
+            </div>
         </div>
-        
-        <textarea id="recipients" rows="4" placeholder="Números (1 por linha): 5511999999999"></textarea>
-        
-        <input type="number" id="delay" value="2" min="1" placeholder="Delay entre envios (segundos)">
-        
-        <button id="sendBtn" class="btn-primary" disabled>Enviar Mensagens</button>
-        <button id="stopBtn" class="btn-danger hidden">Parar</button>
-        
-        <div id="progress" class="hidden">
-            <div id="progressBar" style="height:20px;background:#ddd;width:0%"></div>
-            <div id="progressText">0/0</div>
-        </div>
-    </div>
 
-    <div class="card">
-        <h3>📋 Logs</h3>
-        <div id="logs"></div>
+        <div class="card">
+            <h3>📋 Logs</h3>
+            <button onclick="document.getElementById('logs').innerHTML=''" class="btn-secondary">🗑️ Limpar</button>
+            <div id="logs"></div>
+        </div>
     </div>
 
     <script src="/socket.io/socket.io.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script>
         const socket = io();
-        let isSending = false;
+        let sending = false;
 
         // Elementos
-        const statusDiv = document.getElementById('status');
+        const statusEl = document.getElementById('status');
         const connectBtn = document.getElementById('connectBtn');
         const disconnectBtn = document.getElementById('disconnectBtn');
         const qrcodeContainer = document.getElementById('qrcodeContainer');
-        const qrcodeDiv = document.getElementById('qrcode');
+        const qrcodeEl = document.getElementById('qrcode');
         const sendBtn = document.getElementById('sendBtn');
         const stopBtn = document.getElementById('stopBtn');
         const messageType = document.getElementById('messageType');
         const mediaInput = document.getElementById('mediaInput');
-        const progressDiv = document.getElementById('progress');
+        const progressEl = document.getElementById('progress');
         const progressBar = document.getElementById('progressBar');
         const progressText = document.getElementById('progressText');
-        const logsDiv = document.getElementById('logs');
+        const logsEl = document.getElementById('logs');
 
-        // Socket events
+        // Eventos
         socket.on('connect', () => {
-            addLog('Conectado ao servidor');
+            addLog('✅ Conectado ao servidor');
             socket.emit('check-status');
         });
 
         socket.on('status', (data) => {
-            updateStatus(data);
+            statusEl.className = data.connected ? 'status connected' : 'status disconnected';
+            statusEl.textContent = data.connected ? '✅ ' + data.message : '❌ ' + data.message;
+            connectBtn.disabled = data.connected;
+            disconnectBtn.disabled = !data.connected;
+            sendBtn.disabled = !data.connected;
         });
 
         socket.on('qr', (qr) => {
             qrcodeContainer.classList.remove('hidden');
-            qrcodeDiv.innerHTML = '';
-            QRCode.toCanvas(qrcodeDiv, qr, { width: 200 }, (error) => {
-                if (error) console.error(error);
+            qrcodeEl.innerHTML = '';
+            QRCode.toCanvas(qrcodeEl, qr, { width: 200 }, (err) => {
+                if (err) console.error(err);
             });
+            addLog('📱 QR Code gerado - Escaneie no WhatsApp');
         });
 
         socket.on('ready', () => {
             qrcodeContainer.classList.add('hidden');
-            updateStatus({ connected: true, message: 'Conectado!' });
+            addLog('✅ WhatsApp conectado com sucesso!');
         });
 
         socket.on('disconnected', () => {
-            updateStatus({ connected: false, message: 'Desconectado' });
+            addLog('❌ WhatsApp desconectado');
         });
 
         socket.on('send-progress', (data) => {
             const percent = (data.sent / data.total) * 100;
             progressBar.style.width = percent + '%';
             progressText.textContent = `${data.sent}/${data.total}`;
-            addLog(`${data.status} - ${data.number}`);
+            addLog(`${data.status}: ${data.number}`);
         });
 
         socket.on('send-complete', () => {
-            isSending = false;
+            sending = false;
             sendBtn.disabled = false;
             stopBtn.classList.add('hidden');
-            addLog('✅ Envio completo!');
+            addLog('🎉 Envio completo!');
         });
 
         socket.on('send-error', (error) => {
-            addLog(`❌ Erro: ${error}`, 'error');
+            addLog(`❌ Erro: ${error}`, true);
         });
 
         // Botões
         connectBtn.onclick = () => {
             socket.emit('connect-whatsapp');
-            addLog('Iniciando conexão...');
+            addLog('🔗 Conectando ao WhatsApp...');
         };
 
         disconnectBtn.onclick = () => {
             socket.emit('disconnect-whatsapp');
+            addLog('🔌 Desconectando...');
         };
 
         messageType.onchange = () => {
@@ -147,38 +169,23 @@
             const message = document.getElementById('message').value;
             const recipients = document.getElementById('recipients').value
                 .split('\n')
-                .filter(num => num.trim());
+                .filter(n => n.trim());
             const delay = parseInt(document.getElementById('delay').value) || 2;
             const type = messageType.value;
             const mediaUrl = document.getElementById('mediaUrl').value;
 
-            if (!message && type === 'text') {
-                alert('Digite uma mensagem!');
-                return;
-            }
+            if (!message && type === 'text') return alert('Digite uma mensagem!');
+            if (type === 'image' && !mediaUrl) return alert('Informe a URL da imagem!');
+            if (recipients.length === 0) return alert('Adicione números!');
 
-            if (type === 'image' && !mediaUrl) {
-                alert('Informe a URL da imagem!');
-                return;
-            }
+            if (!confirm(`Enviar para ${recipients.length} contatos?`)) return;
 
-            if (recipients.length === 0) {
-                alert('Adicione pelo menos um número!');
-                return;
-            }
+            socket.emit('send-messages', { type, message, recipients, delay, mediaUrl });
 
-            socket.emit('send-messages', {
-                type,
-                message,
-                recipients,
-                delay,
-                mediaUrl
-            });
-
-            isSending = true;
+            sending = true;
             sendBtn.disabled = true;
             stopBtn.classList.remove('hidden');
-            progressDiv.classList.remove('hidden');
+            progressEl.classList.remove('hidden');
             progressBar.style.width = '0%';
             progressText.textContent = `0/${recipients.length}`;
             addLog(`📤 Iniciando envio para ${recipients.length} contatos...`);
@@ -186,37 +193,18 @@
 
         stopBtn.onclick = () => {
             socket.emit('stop-sending');
-            isSending = false;
+            sending = false;
             sendBtn.disabled = false;
             stopBtn.classList.add('hidden');
             addLog('⏹️ Envio interrompido');
         };
 
         // Funções auxiliares
-        function updateStatus(data) {
-            if (data.connected) {
-                statusDiv.className = 'status connected';
-                statusDiv.textContent = '✅ ' + (data.message || 'Conectado');
-                connectBtn.disabled = true;
-                disconnectBtn.disabled = false;
-                sendBtn.disabled = false;
-            } else {
-                statusDiv.className = 'status disconnected';
-                statusDiv.textContent = '❌ ' + (data.message || 'Desconectado');
-                connectBtn.disabled = false;
-                disconnectBtn.disabled = true;
-                sendBtn.disabled = true;
-                qrcodeContainer.classList.add('hidden');
-            }
-        }
-
-        function addLog(message, type = 'info') {
+        function addLog(message, isError = false) {
             const log = document.createElement('div');
-            const time = new Date().toLocaleTimeString();
-            log.innerHTML = `[${time}] ${message}`;
-            log.style.color = type === 'error' ? '#dc3545' : '#333';
-            log.style.margin = '5px 0';
-            logsDiv.prepend(log);
+            log.className = isError ? 'log log-error' : 'log';
+            log.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsEl.prepend(log);
         }
     </script>
 </body>
