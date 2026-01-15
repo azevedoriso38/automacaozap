@@ -17,6 +17,32 @@ app.get('/', (req, res) => {
     res.sendFile(__dirname + '/index.html');
 });
 
+// Detectar caminho do Chrome no Render
+function getChromePath() {
+    // Tentar vários caminhos comuns no Render
+    const possiblePaths = [
+        '/usr/bin/chromium-browser',
+        '/usr/bin/chromium',
+        '/usr/bin/google-chrome',
+        '/usr/bin/chrome',
+        '/opt/google/chrome/chrome',
+        process.env.CHROMIUM_PATH,
+        process.env.PUPPETEER_EXECUTABLE_PATH
+    ];
+
+    for (const path of possiblePaths) {
+        if (path) {
+            console.log(`Tentando caminho: ${path}`);
+            return path;
+        }
+    }
+
+    return '/usr/bin/chromium-browser'; // Fallback
+}
+
+const chromePath = getChromePath();
+console.log(`🎯 Usando Chrome em: ${chromePath}`);
+
 // Configuração do Puppeteer para Render
 const puppeteerOptions = {
     puppeteer: {
@@ -28,10 +54,17 @@ const puppeteerOptions = {
             '--no-first-run',
             '--no-zygote',
             '--single-process',
-            '--disable-gpu'
+            '--disable-gpu',
+            '--disable-software-rasterizer',
+            '--disable-extensions',
+            '--disable-background-networking',
+            '--disable-default-apps',
+            '--disable-translate',
+            '--disable-features=site-per-process'
         ],
         headless: true,
-        executablePath: process.env.CHROMIUM_PATH || '/usr/bin/chromium'
+        executablePath: chromePath,
+        ignoreDefaultArgs: ['--disable-extensions']
     }
 };
 
@@ -40,13 +73,40 @@ let client = null;
 let isConnected = false;
 let isSending = false;
 
+// Função para testar se o Chrome está acessível
+async function testChrome() {
+    const { exec } = require('child_process');
+    return new Promise((resolve) => {
+        exec(`${chromePath} --version`, (error, stdout) => {
+            if (error) {
+                console.log(`❌ Chrome não encontrado: ${error.message}`);
+                resolve(false);
+            } else {
+                console.log(`✅ Chrome detectado: ${stdout.trim()}`);
+                resolve(true);
+            }
+        });
+    });
+}
+
 // Inicializar WhatsApp
-function initWhatsApp() {
+async function initWhatsApp() {
     console.log('🔄 Iniciando WhatsApp...');
+    
+    // Testar Chrome primeiro
+    const chromeAvailable = await testChrome();
+    if (!chromeAvailable) {
+        console.error('❌ Chrome não está disponível');
+        io.emit('status', { connected: false, message: 'Erro: Chrome não encontrado' });
+        return;
+    }
     
     try {
         client = new Client({
-            authStrategy: new LocalAuth({ clientId: 'whatsapp-bot-render' }),
+            authStrategy: new LocalAuth({ 
+                clientId: 'whatsapp-bot-render',
+                dataPath: './whatsapp_session'
+            }),
             ...puppeteerOptions
         });
 
@@ -57,7 +117,7 @@ function initWhatsApp() {
                 io.emit('qr', qrImage);
             } catch (err) {
                 console.log('QR Code (texto):', qr);
-                io.emit('qr', qr);
+                io.emit('qr-text', qr); // Envia como texto
             }
         });
 
@@ -65,7 +125,7 @@ function initWhatsApp() {
             console.log('✅ WhatsApp conectado!');
             isConnected = true;
             io.emit('ready');
-            io.emit('status', { connected: true, message: 'Conectado!' });
+            io.emit('status', { connected: true, message: 'Conectado e pronto!' });
         });
 
         client.on('authenticated', () => {
@@ -83,31 +143,37 @@ function initWhatsApp() {
             io.emit('disconnected');
             io.emit('status', { connected: false, message: 'Desconectado' });
             
-            // Reconectar após 3 segundos
+            // Tentar reconectar
             setTimeout(() => {
-                if (client) {
-                    client.destroy();
-                }
+                console.log('🔄 Tentando reconectar...');
                 initWhatsApp();
-                if (client) {
-                    client.initialize().catch(err => {
-                        console.error('Erro ao reconectar:', err);
-                    });
-                }
-            }, 3000);
+            }, 5000);
         });
 
         client.on('loading_screen', (percent, message) => {
             console.log(`📊 Carregando: ${percent}% - ${message}`);
         });
 
-        // Inicializar
-        client.initialize().catch(err => {
-            console.error('❌ Erro ao inicializar:', err.message);
-        });
+        // Inicializar com timeout
+        const initTimeout = setTimeout(() => {
+            console.log('⏰ Timeout na inicialização');
+            io.emit('status', { connected: false, message: 'Timeout na inicialização' });
+        }, 30000);
+
+        await client.initialize();
+        clearTimeout(initTimeout);
+        
+        console.log('✅ WhatsApp inicializado com sucesso');
 
     } catch (error) {
-        console.error('❌ Erro crítico:', error);
+        console.error('❌ Erro ao inicializar WhatsApp:', error.message);
+        io.emit('status', { connected: false, message: `Erro: ${error.message}` });
+        
+        // Tentar novamente com configuração alternativa
+        if (error.message.includes('Browser') || error.message.includes('Chrome')) {
+            console.log('🔄 Tentando configuração alternativa...');
+            setTimeout(initWhatsApp, 3000);
+        }
     }
 }
 
@@ -123,11 +189,11 @@ io.on('connection', (socket) => {
 
     // Comandos
     socket.on('connect-whatsapp', () => {
-        console.log('📲 Solicitando conexão');
+        console.log('📲 Solicitando conexão WhatsApp');
         if (!client) {
             initWhatsApp();
         } else if (!isConnected) {
-            client.initialize().catch(console.error);
+            initWhatsApp();
         }
     });
 
@@ -136,7 +202,7 @@ io.on('connection', (socket) => {
         if (client && isConnected) {
             client.destroy();
             isConnected = false;
-            io.emit('status', { connected: false, message: 'Desconectado' });
+            io.emit('status', { connected: false, message: 'Desconectado manualmente' });
         }
     });
 
@@ -148,7 +214,7 @@ io.on('connection', (socket) => {
     });
 
     socket.on('send-messages', async (data) => {
-        if (!isConnected) {
+        if (!isConnected || !client) {
             socket.emit('send-error', 'WhatsApp não conectado');
             return;
         }
@@ -162,30 +228,56 @@ io.on('connection', (socket) => {
         const recipients = data.recipients.filter(r => r.trim());
         const total = recipients.length;
         let sent = 0;
+        let errors = 0;
 
-        console.log(`📤 Enviando para ${total} contatos`);
+        console.log(`📤 Iniciando envio para ${total} contatos`);
 
         for (const number of recipients) {
-            if (!isSending) break;
+            if (!isSending) {
+                console.log('⏹️ Envio interrompido pelo usuário');
+                break;
+            }
 
             try {
                 // Formatar número
                 let phone = number.trim().replace(/\D/g, '');
+                if (phone.length < 10) {
+                    console.log(`⚠️ Número inválido: ${number}`);
+                    errors++;
+                    continue;
+                }
+                
                 if (!phone.includes('@c.us')) {
                     phone = phone + '@c.us';
                 }
 
-                // Enviar
+                // Verificar se o número existe
+                const contact = await client.getNumberId(phone);
+                if (!contact) {
+                    console.log(`⚠️ Número não existe no WhatsApp: ${phone}`);
+                    errors++;
+                    socket.emit('send-progress', {
+                        sent,
+                        total,
+                        number,
+                        status: '⚠️ Número não encontrado'
+                    });
+                    continue;
+                }
+
+                // Enviar mensagem
                 if (data.type === 'image' && data.mediaUrl) {
-                    await client.sendMessage(phone, {
+                    await client.sendMessage(contact._serialized, {
                         image: { url: data.mediaUrl },
                         caption: data.message || ''
                     });
                 } else {
-                    await client.sendMessage(phone, data.message || '');
+                    await client.sendMessage(contact._serialized, data.message || '');
                 }
 
                 sent++;
+                console.log(`✅ Enviado para ${number}`);
+                
                 socket.emit('send-progress', {
                     sent,
                     total,
@@ -193,28 +285,36 @@ io.on('connection', (socket) => {
                     status: '✅ Enviado'
                 });
 
-                // Delay
-                if (sent < total) {
-                    await new Promise(r => setTimeout(r, (data.delay || 2) * 1000));
+                // Delay entre mensagens
+                if (sent + errors < total) {
+                    await new Promise(resolve => setTimeout(resolve, (data.delay || 2) * 1000));
                 }
 
             } catch (error) {
-                console.error(`Erro para ${number}:`, error.message);
+                errors++;
+                console.error(`❌ Erro ao enviar para ${number}:`, error.message);
+                
                 socket.emit('send-progress', {
                     sent,
                     total,
                     number,
-                    status: `❌ ${error.message}`
+                    status: `❌ Erro: ${error.message.substring(0, 50)}`
                 });
             }
         }
 
         isSending = false;
-        socket.emit('send-complete');
-        console.log(`✅ Envio finalizado: ${sent}/${total}`);
+        console.log(`📊 Envio finalizado: ${sent} enviados, ${errors} erros`);
+        
+        socket.emit('send-complete', {
+            sent,
+            total,
+            errors
+        });
     });
 
     socket.on('stop-sending', () => {
+        console.log('⏹️ Parando envio...');
         isSending = false;
     });
 
@@ -223,21 +323,45 @@ io.on('connection', (socket) => {
     });
 });
 
-// Rota health
+// Rota de saúde
 app.get('/health', (req, res) => {
     res.json({ 
         status: 'ok',
         whatsapp: isConnected ? 'connected' : 'disconnected',
-        time: new Date().toISOString()
+        time: new Date().toISOString(),
+        chrome: chromePath
+    });
+});
+
+// Rota para debug
+app.get('/debug', (req, res) => {
+    const { exec } = require('child_process');
+    exec('which chromium-browser chromium google-chrome chrome', (error, stdout) => {
+        res.json({
+            chromePath,
+            available: stdout,
+            connected: isConnected,
+            session: './whatsapp_session'
+        });
     });
 });
 
 // Iniciar servidor
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
-    console.log(`🚀 Servidor rodando: http://localhost:${PORT}`);
-    console.log(`🩺 Health: http://localhost:${PORT}/health`);
+    console.log(`🚀 Servidor rodando na porta ${PORT}`);
+    console.log(`🌐 Acesse: http://localhost:${PORT}`);
+    console.log(`🩺 Health check: http://localhost:${PORT}/health`);
+    console.log(`🔧 Debug: http://localhost:${PORT}/debug`);
     
-    // Iniciar WhatsApp
-    setTimeout(initWhatsApp, 1000);
+    // Iniciar WhatsApp após 2 segundos
+    setTimeout(initWhatsApp, 2000);
 });
+
+// Manter ativo
+setInterval(() => {
+    console.log('💓 Sistema ativo');
+    if (client && isConnected) {
+        console.log('📱 WhatsApp conectado');
+    }
+}, 60000);
