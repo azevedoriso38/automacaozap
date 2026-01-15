@@ -1,11 +1,14 @@
 services:
   - type: web
-    name: whatsapp-broadcast
+    name: whatsapp-bot
     env: node
-    buildCommand: npm install && npm install puppeteer
+    buildCommand: |
+      apt-get update
+      apt-get install -y chromium chromium-sandbox
+      npm install
     startCommand: node index.js
     envVars:
-      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
-        value: true
+      - key: NODE_VERSION
+        value: 18.x
       - key: CHROMIUM_PATH
-        value: /usr/bin/chromium-browser
+        value: /usr/bin/chromium
