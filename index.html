@@ -8,126 +8,232 @@
             padding: 20px;
             max-width: 600px;
             margin: 0 auto;
+            background: #f5f5f5;
         }
         .section {
+            background: white;
             margin: 20px 0;
-            padding: 15px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        h1 {
+            text-align: center;
+            color: #25D366;
         }
         h2 {
-            color: #25D366;
+            color: #075E54;
             margin-top: 0;
+            border-bottom: 2px solid #25D366;
+            padding-bottom: 10px;
         }
         #status {
-            padding: 10px;
+            padding: 15px;
+            border-radius: 5px;
             font-weight: bold;
+            text-align: center;
+            margin: 15px 0;
         }
-        .connected { color: green; background: #e8f5e8; }
-        .disconnected { color: red; background: #fde8e8; }
-        button {
+        .connected { 
+            background: #d4edda; 
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .disconnected { 
+            background: #f8d7da; 
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .button {
             background: #25D366;
             color: white;
             border: none;
-            padding: 10px 15px;
+            padding: 12px 20px;
+            border-radius: 5px;
             cursor: pointer;
+            font-size: 16px;
             margin: 5px;
+            width: 100%;
         }
-        button:hover { background: #1da851; }
+        .button:hover { background: #1da851; }
+        .button-danger { background: #dc3545; }
+        .button-danger:hover { background: #c82333; }
         textarea {
             width: 100%;
-            height: 100px;
+            height: 120px;
             margin: 10px 0;
-        }
-        #qrcode {
-            margin: 20px auto;
-            width: 200px;
-            height: 200px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-family: Arial;
         }
         input[type="file"] {
             margin: 10px 0;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            width: 100%;
+        }
+        #qrcode {
+            text-align: center;
+            margin: 20px 0;
+        }
+        #qrcode img {
+            max-width: 250px;
+            border: 1px solid #ddd;
+            padding: 10px;
+            background: white;
+        }
+        .progress {
+            background: #e9ecef;
+            border-radius: 5px;
+            margin: 10px 0;
+            overflow: hidden;
+        }
+        .progress-bar {
+            background: #25D366;
+            height: 20px;
+            width: 0%;
+            transition: width 0.3s;
+        }
+        .result-item {
+            padding: 8px;
+            margin: 5px 0;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+        .success { background: #d4edda; }
+        .error { background: #f8d7da; }
+        .info {
+            background: #d1ecf1;
+            color: #0c5460;
+            padding: 15px;
+            border-radius: 5px;
+            margin: 15px 0;
+            border: 1px solid #bee5eb;
         }
     </style>
 </head>
 <body>
-    <h1>WhatsApp Broadcast</h1>
+    <h1>📱 WhatsApp Broadcast</h1>
     
     <div class="section">
-        <h2>Conexão WhatsApp</h2>
-        <div id="status" class="disconnected">Desconectado</div>
-        <button onclick="connect()">Conectar WhatsApp</button>
-        <button onclick="disconnect()" style="background: #dc3545;">Desconectar</button>
+        <h2>Status da Conexão</h2>
+        <div id="status" class="disconnected">🔴 Desconectado</div>
+        
+        <div id="connection-buttons">
+            <button class="button" onclick="connectWhatsApp()">🔗 Conectar WhatsApp</button>
+            <button class="button button-danger" onclick="disconnectWhatsApp()">🚫 Desconectar</button>
+            <button class="button" onclick="simulateScan()" style="background: #6c757d;">🔄 Simular Conexão (Teste)</button>
+        </div>
+        
         <div id="qrcode"></div>
+        <div id="qr-instruction" style="text-align: center; color: #666; display: none;">
+            <p>1. Abra o WhatsApp no seu celular</p>
+            <p>2. Toque em ⋮ → Dispositivos conectados → Conectar um dispositivo</p>
+            <p>3. Escaneie o QR Code acima</p>
+        </div>
     </div>
     
     <div class="section">
-        <h2>Enviar Mensagens</h2>
-        <p>1. Carregue lista de contatos (um por linha):</p>
+        <h2>📋 Envio em Massa</h2>
+        
+        <div class="info">
+            <strong>⚠️ Modo Demonstração:</strong> 
+            Para envio real, é necessário conectar uma API de WhatsApp. 
+            Atualmente funcionando em modo simulação.
+        </div>
+        
+        <p><strong>1. Carregar Contatos:</strong></p>
+        <p>Crie um arquivo .txt com um número por linha:</p>
+        <p><small>Exemplo: 11999999999<br>21988888888<br>31977777777</small></p>
         <input type="file" id="contactsFile" accept=".txt,.csv">
         <div id="fileInfo"></div>
         
-        <p>2. Digite sua mensagem:</p>
+        <p><strong>2. Digitar Mensagem:</strong></p>
         <textarea id="message" placeholder="Digite sua mensagem aqui..."></textarea>
         
-        <p>3. Enviar:</p>
-        <button onclick="sendMessages()">Enviar Mensagens</button>
+        <p><strong>3. Enviar:</strong></p>
+        <button class="button" onclick="sendMessages()">📤 Enviar Mensagens</button>
+        
+        <div id="progress" style="display: none;">
+            <p>Progresso: <span id="progress-text">0/0</span></p>
+            <div class="progress">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+        </div>
         
         <div id="results"></div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         let socket = io();
         let contactsList = [];
+        let isConnected = false;
         
-        // Conexão WebSocket
+        // Conexão Socket.io
         socket.on('connect', () => {
             console.log('Conectado ao servidor');
         });
         
-        // Receber QR Code
-        socket.on('qr', (qr) => {
-            document.getElementById('qrcode').innerHTML = '';
-            QRCode.toCanvas(document.getElementById('qrcode'), qr, {
-                width: 200,
-                height: 200
-            });
-            document.getElementById('status').innerHTML = 'Escaneie o QR Code';
-            document.getElementById('status').className = 'disconnected';
+        socket.on('status', (data) => {
+            updateStatus(data.connected, data.message);
         });
         
-        // Quando autenticado
+        socket.on('qr', (qrCode) => {
+            document.getElementById('qrcode').innerHTML = 
+                `<img src="${qrCode}" alt="QR Code">`;
+            document.getElementById('qr-instruction').style.display = 'block';
+            updateStatus(false, 'Escaneie o QR Code');
+        });
+        
         socket.on('authenticated', () => {
-            document.getElementById('status').innerHTML = 'Conectado ✓';
-            document.getElementById('status').className = 'connected';
             document.getElementById('qrcode').innerHTML = '';
+            document.getElementById('qr-instruction').style.display = 'none';
+            updateStatus(true, 'Conectado ✓');
         });
         
-        // Quando pronto
-        socket.on('ready', (msg) => {
-            document.getElementById('status').innerHTML = 'Pronto para enviar ✓';
-            document.getElementById('status').className = 'connected';
-        });
-        
-        // Quando desconectado
         socket.on('disconnected', () => {
-            document.getElementById('status').innerHTML = 'Desconectado';
-            document.getElementById('status').className = 'disconnected';
+            updateStatus(false, 'Desconectado');
+        });
+        
+        socket.on('message_progress', (data) => {
+            updateProgress(data.current, data.total, data.contact, data.status);
         });
         
         // Funções
-        function connect() {
+        function updateStatus(connected, message) {
+            isConnected = connected;
+            const statusDiv = document.getElementById('status');
+            
+            if (connected) {
+                statusDiv.innerHTML = '🟢 ' + message;
+                statusDiv.className = 'connected';
+            } else {
+                statusDiv.innerHTML = '🔴 ' + message;
+                statusDiv.className = 'disconnected';
+            }
+        }
+        
+        function connectWhatsApp() {
             socket.emit('initialize');
-            document.getElementById('status').innerHTML = 'Inicializando...';
+            updateStatus(false, 'Inicializando...');
         }
         
-        async function disconnect() {
-            await fetch('/api/logout');
-            location.reload();
+        function disconnectWhatsApp() {
+            fetch('/api/disconnect')
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message);
+                });
         }
         
-        // Processar arquivo de contatos
+        function simulateScan() {
+            socket.emit('simulate_scan');
+        }
+        
+        // Processar arquivo
         document.getElementById('contactsFile').addEventListener('change', async function(e) {
             const file = e.target.files[0];
             if (!file) return;
@@ -145,12 +251,13 @@
                 if (data.success) {
                     contactsList = data.contacts;
                     document.getElementById('fileInfo').innerHTML = 
-                        `<strong>${data.count} contatos carregados</strong>`;
+                        `<div class="info">✅ <strong>${data.count} contatos carregados</strong><br>
+                        Exemplo: ${data.sample.join(', ')}...</div>`;
                 } else {
-                    alert('Erro ao carregar contatos: ' + data.error);
+                    alert('Erro: ' + data.error);
                 }
             } catch (error) {
-                alert('Erro ao processar arquivo');
+                alert('Erro ao carregar arquivo');
             }
         });
         
@@ -168,6 +275,18 @@
                 return;
             }
             
+            if (!isConnected) {
+                if (!confirm('WhatsApp não está conectado. Deseja continuar em modo simulação?')) {
+                    return;
+                }
+            }
+            
+            // Mostrar progresso
+            document.getElementById('progress').style.display = 'block';
+            document.getElementById('progress-text').textContent = '0/' + contactsList.length;
+            document.getElementById('progress-bar').style.width = '0%';
+            document.getElementById('results').innerHTML = '';
+            
             const response = await fetch('/api/send-messages', {
                 method: 'POST',
                 headers: {
@@ -182,34 +301,48 @@
             const data = await response.json();
             
             if (data.success) {
-                let resultsHtml = `<h3>Resultados (${data.total} enviados):</h3>`;
-                let success = 0, error = 0;
+                let resultsHtml = `<h3>📊 Resultados:</h3>`;
+                resultsHtml += `<p>Total: ${data.total} | ✅ Enviados: ${data.sent} | ❌ Falhas: ${data.failed}</p>`;
+                
+                if (data.note) {
+                    resultsHtml += `<div class="info">${data.note}</div>`;
+                }
                 
                 data.results.forEach(result => {
-                    if (result.status === 'success') {
-                        success++;
-                        resultsHtml += `<div style="color:green;">✓ ${result.contact}</div>`;
-                    } else {
-                        error++;
-                        resultsHtml += `<div style="color:red;">✗ ${result.contact}: ${result.message}</div>`;
-                    }
+                    const statusClass = result.status === 'success' ? 'success' : 'error';
+                    const icon = result.status === 'success' ? '✅' : '❌';
+                    resultsHtml += `
+                        <div class="result-item ${statusClass}">
+                            ${icon} ${result.contact}: ${result.message}
+                        </div>
+                    `;
                 });
                 
-                resultsHtml += `<br><strong>Sucesso: ${success} | Erro: ${error}</strong>`;
                 document.getElementById('results').innerHTML = resultsHtml;
             } else {
                 alert('Erro: ' + data.error);
             }
+            
+            // Esconder progresso
+            setTimeout(() => {
+                document.getElementById('progress').style.display = 'none';
+            }, 2000);
         }
         
-        // Verificar status ao carregar
+        function updateProgress(current, total, contact, status) {
+            const percent = Math.round((current / total) * 100);
+            document.getElementById('progress-text').textContent = `${current}/${total}`;
+            document.getElementById('progress-bar').style.width = `${percent}%`;
+        }
+        
+        // Carregar status inicial
         window.onload = async () => {
-            const response = await fetch('/api/status');
-            const status = await response.json();
-            
-            if (status.authenticated) {
-                document.getElementById('status').innerHTML = 'Conectado ✓';
-                document.getElementById('status').className = 'connected';
+            try {
+                const response = await fetch('/api/status');
+                const status = await response.json();
+                updateStatus(status.connected, status.connected ? 'Conectado' : 'Desconectado');
+            } catch (error) {
+                console.log('Erro ao carregar status:', error);
             }
         };
     </script>
