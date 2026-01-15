@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: whatsapp-broadcast
+    env: node
+    buildCommand: npm install && npm install puppeteer
+    startCommand: node index.js
+    envVars:
+      - key: PUPPETEER_SKIP_CHROMIUM_DOWNLOAD
+        value: true
+      - key: CHROMIUM_PATH
+        value: /usr/bin/chromium-browser
