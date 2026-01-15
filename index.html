@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WhatsApp Broadcast</title>
+    <style>
+        body {
+            font-family: Arial;
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+        .section {
+            margin: 20px 0;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+        h2 {
+            color: #25D366;
+            margin-top: 0;
+        }
+        #status {
+            padding: 10px;
+            font-weight: bold;
+        }
+        .connected { color: green; background: #e8f5e8; }
+        .disconnected { color: red; background: #fde8e8; }
+        button {
+            background: #25D366;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover { background: #1da851; }
+        textarea {
+            width: 100%;
+            height: 100px;
+            margin: 10px 0;
+        }
+        #qrcode {
+            margin: 20px auto;
+            width: 200px;
+            height: 200px;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <h1>WhatsApp Broadcast</h1>
+    
+    <div class="section">
+        <h2>Conexão WhatsApp</h2>
+        <div id="status" class="disconnected">Desconectado</div>
+        <button onclick="connect()">Conectar WhatsApp</button>
+        <button onclick="disconnect()" style="background: #dc3545;">Desconectar</button>
+        <div id="qrcode"></div>
+    </div>
+    
+    <div class="section">
+        <h2>Enviar Mensagens</h2>
+        <p>1. Carregue lista de contatos (um por linha):</p>
+        <input type="file" id="contactsFile" accept=".txt,.csv">
+        <div id="fileInfo"></div>
+        
+        <p>2. Digite sua mensagem:</p>
+        <textarea id="message" placeholder="Digite sua mensagem aqui..."></textarea>
+        
+        <p>3. Enviar:</p>
+        <button onclick="sendMessages()">Enviar Mensagens</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        let socket = io();
+        let contactsList = [];
+        
+        // Conexão WebSocket
+        socket.on('connect', () => {
+            console.log('Conectado ao servidor');
+        });
+        
+        // Receber QR Code
+        socket.on('qr', (qr) => {
+            document.getElementById('qrcode').innerHTML = '';
+            QRCode.toCanvas(document.getElementById('qrcode'), qr, {
+                width: 200,
+                height: 200
+            });
+            document.getElementById('status').innerHTML = 'Escaneie o QR Code';
+            document.getElementById('status').className = 'disconnected';
+        });
+        
+        // Quando autenticado
+        socket.on('authenticated', () => {
+            document.getElementById('status').innerHTML = 'Conectado ✓';
+            document.getElementById('status').className = 'connected';
+            document.getElementById('qrcode').innerHTML = '';
+        });
+        
+        // Quando pronto
+        socket.on('ready', (msg) => {
+            document.getElementById('status').innerHTML = 'Pronto para enviar ✓';
+            document.getElementById('status').className = 'connected';
+        });
+        
+        // Quando desconectado
+        socket.on('disconnected', () => {
+            document.getElementById('status').innerHTML = 'Desconectado';
+            document.getElementById('status').className = 'disconnected';
+        });
+        
+        // Funções
+        function connect() {
+            socket.emit('initialize');
+            document.getElementById('status').innerHTML = 'Inicializando...';
+        }
+        
+        async function disconnect() {
+            await fetch('/api/logout');
+            location.reload();
+        }
+        
+        // Processar arquivo de contatos
+        document.getElementById('contactsFile').addEventListener('change', async function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            const formData = new FormData();
+            formData.append('contactsFile', file);
+            
+            try {
+                const response = await fetch('/api/upload-contacts', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    contactsList = data.contacts;
+                    document.getElementById('fileInfo').innerHTML = 
+                        `<strong>${data.count} contatos carregados</strong>`;
+                } else {
+                    alert('Erro ao carregar contatos: ' + data.error);
+                }
+            } catch (error) {
+                alert('Erro ao processar arquivo');
+            }
+        });
+        
+        // Enviar mensagens
+        async function sendMessages() {
+            const message = document.getElementById('message').value.trim();
+            
+            if (!message) {
+                alert('Digite uma mensagem');
+                return;
+            }
+            
+            if (contactsList.length === 0) {
+                alert('Carregue uma lista de contatos primeiro');
+                return;
+            }
+            
+            const response = await fetch('/api/send-messages', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    contacts: contactsList,
+                    message: message
+                })
+            });
+            
+            const data = await response.json();
+            
+            if (data.success) {
+                let resultsHtml = `<h3>Resultados (${data.total} enviados):</h3>`;
+                let success = 0, error = 0;
+                
+                data.results.forEach(result => {
+                    if (result.status === 'success') {
+                        success++;
+                        resultsHtml += `<div style="color:green;">✓ ${result.contact}</div>`;
+                    } else {
+                        error++;
+                        resultsHtml += `<div style="color:red;">✗ ${result.contact}: ${result.message}</div>`;
+                    }
+                });
+                
+                resultsHtml += `<br><strong>Sucesso: ${success} | Erro: ${error}</strong>`;
+                document.getElementById('results').innerHTML = resultsHtml;
+            } else {
+                alert('Erro: ' + data.error);
+            }
+        }
+        
+        // Verificar status ao carregar
+        window.onload = async () => {
+            const response = await fetch('/api/status');
+            const status = await response.json();
+            
+            if (status.authenticated) {
+                document.getElementById('status').innerHTML = 'Conectado ✓';
+                document.getElementById('status').className = 'connected';
+            }
+        };
+    </script>
+</body>
+</html>
