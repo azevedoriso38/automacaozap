@@ -1,7 +1,6 @@
 {
-  "name": "whatsapp-bot-massivo",
+  "name": "whatsapp-bot",
   "version": "1.0.0",
-  "description": "Bot WhatsApp para envio em massa",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,7 +8,6 @@
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2",
-    "venom-bot": "^5.0.1",
     "qrcode": "^1.5.3"
   }
 }
