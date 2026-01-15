@@ -5,12 +5,13 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "build": "apt-get update && apt-get install -y wget chromium chromium-common chromium-driver"
+    "build": "./install-chrome.sh"
   },
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2",
     "whatsapp-web.js": "^1.23.0",
-    "qrcode": "^1.5.3"
+    "qrcode": "^1.5.3",
+    "puppeteer": "^22.9.0"
   }
 }
