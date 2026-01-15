@@ -1,7 +1,7 @@
 {
-  "name": "zap-broadcast",
+  "name": "whatsapp-bot-massivo",
   "version": "1.0.0",
-  "description": "WhatsApp Broadcast com API WPPConnect",
+  "description": "Bot WhatsApp para envio em massa",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,12 +9,7 @@
   "dependencies": {
     "express": "^4.18.2",
     "socket.io": "^4.7.2",
-    "axios": "^1.6.2",
-    "qrcode": "^1.5.3",
-    "multer": "^1.4.5-lts.1",
-    "cors": "^2.8.5"
-  },
-  "engines": {
-    "node": ">=18.0.0"
+    "whatsapp-web.js": "^1.23.0",
+    "qrcode": "^1.5.3"
   }
 }
