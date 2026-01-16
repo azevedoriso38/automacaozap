@@ -15,10 +15,13 @@ app.use(express.static(__dirname));
 // WhatsApp client
 const client = new Client({
     authStrategy: new LocalAuth(),
-    puppeteer: {
+    "puppeteer": "^21.3.0"
+        executablePath: '/usr/bin/google-chrome', // Caminho do Chrome no Render
+        headless: true,                           // Rodar sem interface gráfica
         args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
 });
+
 
 // QR Code
 client.on('qr', qr => {
