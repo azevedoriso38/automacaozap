@@ -1,237 +1,75 @@
 <!DOCTYPE html>
-<html>
+<html lang="pt-br">
 <head>
-    <title>WhatsApp Bot REAL</title>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WhatsApp Sender</title>
+
+    <script src="/socket.io/socket.io.js"></script>
+
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: Arial; background: #f0f2f5; color: #333; }
-        .container { max-width: 800px; margin: 0 auto; padding: 20px; }
-        header { background: #25D366; color: white; padding: 25px; text-align: center; border-radius: 10px 10px 0 0; }
-        .card { background: white; padding: 25px; margin: 20px 0; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        h1 { margin-bottom: 10px; }
-        h3 { color: #128C7E; margin-bottom: 15px; }
-        .status { padding: 15px; margin: 15px 0; border-radius: 8px; font-weight: bold; }
-        .connected { background: #d4edda; color: #155724; }
-        .disconnected { background: #f8d7da; color: #721c24; }
-        button { padding: 12px 24px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; margin: 5px; }
-        .btn-primary { background: #25D366; color: white; }
-        .btn-primary:hover { background: #1da851; }
-        .btn-danger { background: #dc3545; color: white; }
-        .btn-success { background: #28a745; color: white; }
-        textarea, input { width: 100%; padding: 12px; margin: 8px 0; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
-        .hidden { display: none; }
-        #qrcode { text-align: center; margin: 20px; }
-        .progress { height: 25px; background: #e9ecef; border-radius: 12px; overflow: hidden; margin: 15px 0; }
-        .progress-bar { height: 100%; background: linear-gradient(90deg, #25D366, #128C7E); width: 0%; transition: width 0.3s; }
-        .logs { max-height: 300px; overflow-y: auto; background: #f8f9fa; padding: 15px; border-radius: 8px; }
-        .log { padding: 8px; margin: 5px 0; background: white; border-left: 4px solid #25D366; }
-        .log-error { border-color: #dc3545; }
-        footer { text-align: center; margin-top: 30px; color: #6c757d; font-size: 14px; }
+        body {
+            font-family: Arial, sans-serif;
+            background: #f4f4f4;
+            padding: 20px;
+        }
+        #qr {
+            margin: 20px 0;
+        }
+        textarea, input {
+            width: 100%;
+            padding: 10px;
+            margin-top: 10px;
+        }
+        button {
+            padding: 12px;
+            margin-top: 10px;
+            width: 100%;
+            font-size: 16px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <header>
-            <h1>📱 WhatsApp Bot REAL</h1>
-            <p>Envio em massa funcional - Conecte seu WhatsApp de verdade</p>
-        </header>
-        
-        <div class="card">
-            <h3>🔗 Status da Conexão</h3>
-            <div id="status" class="status disconnected">❌ Desconectado</div>
-            <button id="connectBtn" class="btn-primary">🔗 Conectar WhatsApp REAL</button>
-            <div id="qrcode-container" class="hidden">
-                <h4>📲 Escaneie este QR Code no seu WhatsApp:</h4>
-                <div id="qrcode"></div>
-                <p style="margin-top: 15px; color: #666;">
-                    <strong>Como escanear:</strong><br>
-                    1. Abra o WhatsApp no celular<br>
-                    2. Toque em ⋮ (Menu) → Dispositivos conectados<br>
-                    3. Toque em "Conectar um dispositivo"<br>
-                    4. Escaneie o código acima
-                </p>
-            </div>
-        </div>
-        
-        <div class="card">
-            <h3>✉️ Envio em Massa</h3>
-            <textarea id="message" rows="4" placeholder="Digite a mensagem que será enviada..."></textarea>
-            <textarea id="numbers" rows="4" placeholder="Digite os números de telefone (1 por linha)
-Exemplo:
-5511999999999
-5511888888888
-5511777777777"></textarea>
-            <div style="display: flex; gap: 15px; align-items: center;">
-                <div style="flex: 1;">
-                    <label>⏱️ Delay entre mensagens (segundos):</label>
-                    <input type="number" id="delay" value="3" min="1" max="10">
-                </div>
-                <div id="count" style="font-weight: bold; color: #128C7E;">0 números</div>
-            </div>
-            
-            <div style="margin-top: 20px;">
-                <button id="sendBtn" class="btn-success" disabled>🚀 Enviar Mensagens em Massa</button>
-                <button id="stopBtn" class="btn-danger hidden">⏹️ Parar Envio</button>
-            </div>
-            
-            <div id="progress-container" class="hidden">
-                <h4>📊 Progresso do Envio</h4>
-                <div class="progress">
-                    <div id="progress-bar" class="progress-bar"></div>
-                </div>
-                <div id="progress-text" style="text-align: center; font-weight: bold; margin: 10px 0;">0/0</div>
-            </div>
-        </div>
-        
-        <div class="card">
-            <h3>📋 Logs do Sistema</h3>
-            <button onclick="clearLogs()" style="background: #6c757d; color: white; margin-bottom: 10px;">🗑️ Limpar Logs</button>
-            <div id="logs" class="logs"></div>
-        </div>
-        
-        <footer>
-            <p>⚠️ Este sistema usa API real do WhatsApp. Use com responsabilidade.</p>
-            <p>© 2023 WhatsApp Bot - Sistema de envio em massa</p>
-        </footer>
-    </div>
 
-    <script src="/socket.io/socket.io.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
-    <script>
-        const socket = io();
-        let connected = false;
-        
-        // Elementos
-        const statusEl = document.getElementById('status');
-        const connectBtn = document.getElementById('connectBtn');
-        const qrcodeContainer = document.getElementById('qrcode-container');
-        const qrcodeEl = document.getElementById('qrcode');
-        const sendBtn = document.getElementById('sendBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const progressContainer = document.getElementById('progress-container');
-        const progressBar = document.getElementById('progress-bar');
-        const progressText = document.getElementById('progress-text');
-        const logsEl = document.getElementById('logs');
-        const numbersInput = document.getElementById('numbers');
-        const countEl = document.getElementById('count');
-        
-        // Atualizar contador de números
-        numbersInput.addEventListener('input', updateCount);
-        function updateCount() {
-            const count = numbersInput.value.split('\n').filter(n => n.trim()).length;
-            countEl.textContent = `${count} números`;
-        }
-        
-        // Socket events
-        socket.on('connect', () => {
-            addLog('✅ Conectado ao servidor');
-        });
-        
-        socket.on('status', (data) => {
-            connected = data.connected;
-            statusEl.className = data.connected ? 'status connected' : 'status disconnected';
-            statusEl.innerHTML = data.connected ? '✅ ' + data.message : '❌ ' + data.message;
-            sendBtn.disabled = !data.connected;
-        });
-        
-        socket.on('qr', (qrImage) => {
-            qrcodeContainer.classList.remove('hidden');
-            qrcodeEl.innerHTML = '';
-            QRCode.toCanvas(qrcodeEl, qrImage, { width: 250 }, (err) => {
-                if (err) console.error(err);
-            });
-            addLog('📱 QR Code gerado - Escaneie no WhatsApp');
-        });
-        
-        socket.on('ready', () => {
-            qrcodeContainer.classList.add('hidden');
-            addLog('🎉 WhatsApp conectado com sucesso!');
-            addLog('✅ Pronto para enviar mensagens');
-        });
-        
-        socket.on('send-progress', (data) => {
-            const percent = (data.sent / data.total) * 100;
-            progressBar.style.width = percent + '%';
-            progressText.textContent = `${data.sent}/${data.total} - ${data.number}`;
-            addLog(`${data.status}: ${data.number}`);
-        });
-        
-        socket.on('send-complete', (data) => {
-            sendBtn.disabled = false;
-            stopBtn.classList.add('hidden');
-            progressContainer.classList.add('hidden');
-            addLog(`🎉 Envio finalizado! ${data.sent} enviados, ${data.errors} erros`);
-        });
-        
-        socket.on('send-error', (error) => {
-            addLog(`❌ Erro: ${error}`, true);
-        });
-        
-        // Botões
-        connectBtn.onclick = () => {
-            socket.emit('connect-whatsapp');
-            addLog('🔄 Iniciando conexão REAL do WhatsApp...');
-        };
-        
-        sendBtn.onclick = () => {
-            const message = document.getElementById('message').value.trim();
-            const numbers = numbersInput.value.split('\n').filter(n => n.trim());
-            const delay = parseInt(document.getElementById('delay').value) || 3;
-            
-            if (!message) {
-                alert('Digite a mensagem que será enviada!');
-                return;
-            }
-            
-            if (numbers.length === 0) {
-                alert('Adicione pelo menos um número de telefone!');
-                return;
-            }
-            
-            if (!confirm(`Enviar mensagem para ${numbers.length} contatos?\n\nA mensagem será enviada com ${delay} segundos de intervalo entre cada envio.`)) {
-                return;
-            }
-            
-            socket.emit('send-messages', {
-                message: message,
-                recipients: numbers,
-                delay: delay
-            });
-            
-            sendBtn.disabled = true;
-            stopBtn.classList.remove('hidden');
-            progressContainer.classList.remove('hidden');
-            progressBar.style.width = '0%';
-            progressText.textContent = `0/${numbers.length}`;
-            
-            addLog(`📤 Iniciando envio REAL para ${numbers.length} contatos...`);
-        };
-        
-        stopBtn.onclick = () => {
-            socket.emit('stop-sending');
-            sendBtn.disabled = false;
-            stopBtn.classList.add('hidden');
-            addLog('⏹️ Envio interrompido pelo usuário');
-        };
-        
-        // Funções auxiliares
-        function addLog(message, isError = false) {
-            const log = document.createElement('div');
-            log.className = isError ? 'log log-error' : 'log';
-            log.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
-            logsEl.prepend(log);
-        }
-        
-        function clearLogs() {
-            logsEl.innerHTML = '';
-            addLog('🗑️ Logs limpos');
-        }
-        
-        // Inicializar
-        updateCount();
-        addLog('Sistema iniciado. Clique em "Conectar WhatsApp REAL" para começar.');
-    </script>
+<h2>WhatsApp Web</h2>
+
+<div id="status">Aguardando QR Code...</div>
+<div id="qr"></div>
+
+<hr>
+
+<h3>Enviar Mensagem</h3>
+
+<label>Números (com DDI, separados por vírgula)</label>
+<input id="numbers" placeholder="5511999999999, 5511888888888">
+
+<label>Mensagem</label>
+<textarea id="message" rows="4"></textarea>
+
+<button onclick="sendMessage()">Enviar</button>
+
+<script>
+    const socket = io();
+
+    socket.on('qr', qr => {
+        document.getElementById('qr').innerHTML =
+            `<img src="https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${qr}">`;
+        document.getElementById('status').innerText = 'Escaneie o QR Code';
+    });
+
+    socket.on('ready', () => {
+        document.getElementById('status').innerText = 'WhatsApp conectado ✅';
+        document.getElementById('qr').innerHTML = '';
+    });
+
+    function sendMessage() {
+        const numbers = document.getElementById('numbers').value;
+        const message = document.getElementById('message').value;
+
+        socket.emit('send-message', { numbers, message });
+        alert('Mensagens enviadas');
+    }
+</script>
+
 </body>
 </html>
