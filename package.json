@@ -1,6 +1,7 @@
 {
   "name": "zap-whatsapp",
   "version": "1.0.0",
+  "description": "Projeto WhatsApp via whatsapp-web.js",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
@@ -9,7 +10,7 @@
     "express": "^4.18.2",
     "socket.io": "^4.7.5",
     "whatsapp-web.js": "^1.25.0",
-    "qrcode-terminal": "^0.12.0"
+    "qrcode-terminal": "^0.12.0",
     "puppeteer": "^21.3.0"
   }
 }
