@@ -1,63 +1,64 @@
-// ==========================
-//  IMPORTS
-// ==========================
-const { Client, LocalAuth } = require('whatsapp-web.js'); // Biblioteca WhatsApp
-const express = require('express');                       // Servidor web simples
-const qrcode = require('qrcode-terminal');                // Mostrar QR no log
+const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
+const { Client, LocalAuth } = require('whatsapp-web.js');
 
-// ==========================
-//  CONFIGURAÇÃO DO SERVIDOR
-// ==========================
 const app = express();
-const PORT = process.env.PORT || 3000; // Porta dinâmica para Render
+const server = http.createServer(app);
+const io = new Server(server);
 
-// ==========================
-//  CONFIGURAÇÃO DO WHATSAPP
-// ==========================
+const PORT = process.env.PORT || 3000;
+
+// Servir arquivos estáticos (index.html)
+app.use(express.static(__dirname));
+
+// WhatsApp client
 const client = new Client({
-    authStrategy: new LocalAuth(),   // Salva sessão localmente
+    authStrategy: new LocalAuth(),
     puppeteer: {
-        args: [
-            '--no-sandbox',           // Necessário para Render / VPS
-            '--disable-setuid-sandbox'
-        ]
+        args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
 });
 
-// ==========================
-//  EVENTO QR CODE
-// ==========================
+// QR Code
 client.on('qr', qr => {
-    console.log('==============================');
-    console.log('ESCANEIE O QR CODE ABAIXO:');
-    console.log(qr);
-    console.log('==============================');
-    // Opcional: mostrar QR no terminal como gráfico
-    qrcode.generate(qr, { small: true });
+    console.log('QR Code gerado');
+    io.emit('qr', qr); // envia QR para o navegador
 });
 
-// ==========================
-//  EVENTO PRONTO
-// ==========================
+// Conectado
 client.on('ready', () => {
-    console.log('✅ WhatsApp conectado!');
+    console.log('WhatsApp conectado');
+    io.emit('ready');
 });
 
-// ==========================
-//  INICIALIZA CLIENTE
-// ==========================
+// Inicializa WhatsApp
 client.initialize();
 
-// ==========================
-//  ROTA DE TESTE DO SERVIDOR
-// ==========================
-app.get('/', (req, res) => {
-    res.send('Servidor rodando ✅');
+// Socket
+io.on('connection', socket => {
+    console.log('Usuário conectado');
+
+    socket.on('send-message', async data => {
+        const { numbers, message } = data;
+
+        const list = numbers.split(',').map(n => n.trim());
+
+        for (let number of list) {
+            const chatId = number.includes('@c.us')
+                ? number
+                : number + '@c.us';
+
+            try {
+                await client.sendMessage(chatId, message);
+            } catch (err) {
+                console.log('Erro ao enviar para', number);
+            }
+        }
+    });
 });
 
-// ==========================
-//  START DO SERVIDOR
-// ==========================
-app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta ${PORT}`);
+// Start server
+server.listen(PORT, () => {
+    console.log('Servidor rodando na porta ' + PORT);
 });
