@@ -16,7 +16,6 @@ app.use(express.static(__dirname));
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        executablePath: '/usr/bin/google-chrome', // Chrome já instalado no Render
         headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
