@@ -1,17 +1,14 @@
 {
-  "name": "whatsapp-bot-render",
+  "name": "bot-zap-render",
   "version": "1.0.0",
-  "description": "Bot do WhatsApp para rodar no Render",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node index.js",
+    "install": "node install-chromium.js"
   },
   "dependencies": {
-    "qrcode-terminal": "^0.12.0",
     "whatsapp-web.js": "^1.23.0",
-    "express": "^4.18.2"
-  },
-  "engines": {
-    "node": ">=14.0.0"
+    "express": "^4.18.2",
+    "puppeteer": "^22.6.5"
   }
 }
