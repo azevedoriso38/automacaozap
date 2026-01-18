@@ -1,65 +1,35 @@
-const express = require('express');
-const http = require('http');
-const { Server } = require('socket.io');
 const { Client, LocalAuth } = require('whatsapp-web.js');
-
+const express = require('express');
 const app = express();
-const server = http.createServer(app);
-const io = new Server(server);
-
 const PORT = process.env.PORT || 3000;
 
-// Servir arquivos estáticos (index.html)
-app.use(express.static(__dirname));
-
-// WhatsApp client
+// Inicializar cliente do WhatsApp
 const client = new Client({
     authStrategy: new LocalAuth(),
     puppeteer: {
-        headless: true,
         args: ['--no-sandbox', '--disable-setuid-sandbox']
     }
 });
 
-// QR Code
+// QR Code no console
 client.on('qr', qr => {
-    console.log('QR Code gerado');
-    io.emit('qr', qr); // envia QR para o navegador
+    console.log('QR CODE:', qr);
 });
 
-// Conectado
+// Quando conectar
 client.on('ready', () => {
-    console.log('WhatsApp conectado');
-    io.emit('ready');
+    console.log('✅ WhatsApp conectado!');
 });
 
-// Inicializa WhatsApp
+// Iniciar
 client.initialize();
 
-// Socket
-io.on('connection', socket => {
-    console.log('Usuário conectado');
-
-    socket.on('send-message', async data => {
-        const { numbers, message } = data;
-
-        const list = numbers.split(',').map(n => n.trim());
-
-        for (let number of list) {
-            const chatId = number.includes('@c.us')
-                ? number
-                : number + '@c.us';
-
-            try {
-                await client.sendMessage(chatId, message);
-            } catch (err) {
-                console.log('Erro ao enviar para', number);
-            }
-        }
-    });
+// Rota simples
+app.get('/', (req, res) => {
+    res.send('Bot WhatsApp está rodando! Verifique os logs para o QR Code.');
 });
 
-// Start server
-server.listen(PORT, () => {
-    console.log('Servidor rodando na porta ' + PORT);
+// Iniciar servidor
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta ${PORT}`);
 });
